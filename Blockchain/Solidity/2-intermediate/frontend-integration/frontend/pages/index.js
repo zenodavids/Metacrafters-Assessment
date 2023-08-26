@@ -1,58 +1,148 @@
 'use client';
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ethers, utils } from 'ethers';
 import {
-  useWalletConnection,
-  useTokenInfo,
-  useTransferToken,
-  useBurnTokens,
-  useMintTokens,
-} from '../utils/hooks';
+  SMART_CONTRACT_ADDRESS,
+  SMART_CONTRACT_ABI,
+} from '@/utils/contractUtils';
 
-import { SMART_CONTRACT_ADDRESS } from '../utils/contractUtils';
-
-const Home = () => {
-  const { isWalletConnected, userAddress, checkIfWalletIsConnected } =
-    useWalletConnection();
-  const {
-    tokenName,
-    tokenSymbol,
-    tokenInventory,
-    isCentralBank,
-    centralBankAddress,
-    setTokenInventory,
-  } = useTokenInfo();
-  const transferToken = useTransferToken();
-  const burnTokens = useBurnTokens();
-  const mintTokens = useMintTokens();
-  const [inputValue, setInputValue] = React.useState({
+export default function Home() {
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [inputValue, setInputValue] = useState({
     walletAddress: '',
-    transferAmount: '',
+    transferNGNtoken: '',
     burnAmount: '',
     mintAmount: '',
   });
-  const [error, setError] = React.useState(null);
+  const [error, setError] = useState(null);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenSymbol, setTokenSymbol] = useState('');
+  const [isTokenOwner, setIsTokenOwner] = useState(false);
+  const [tokenOwnerAddress, setTokenOwnerAddress] = useState(null);
+  const [yourWalletAddress, setYourWalletAddress] = useState(null);
+  const [tokenTotalInventory, setTokenTotalInventory] = useState(0);
 
-  const handleInputChange = (event) => {
+  const walletConnected = async () => {
+    try {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts',
+        });
+        const account = accounts[0];
+        setIsWalletConnected(true);
+        setYourWalletAddress(account);
+      } else {
+        setError(error);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const callContract = async () => {
+    try {
+      if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(
+          SMART_CONTRACT_ADDRESS,
+          SMART_CONTRACT_ABI,
+          signer
+        );
+        const [account] = await window.ethereum.request({
+          method: 'eth_requestAccounts',
+        });
+
+        let tokenName = await contract.tokenName();
+        let tokenSymbol = await contract.tokenSymbol();
+        let tokenOwner = await contract.centralBank();
+        let inventory = await contract.inventory();
+
+        inventory = utils.formatEther(inventory);
+
+        setTokenName(tokenName);
+        setTokenSymbol(tokenSymbol);
+        setTokenTotalInventory(inventory);
+        // setTokenBalance(balance);
+        setTokenOwnerAddress(tokenOwner);
+
+        if (account.toLowerCase() === tokenOwner.toLowerCase()) {
+          setIsTokenOwner(true);
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const mint = async (e) => {
+    e.preventDefault();
+    try {
+      if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(
+          SMART_CONTRACT_ADDRESS,
+          SMART_CONTRACT_ABI,
+          signer
+        );
+
+        const amount = utils.parseEther(inputValue.mintAmount);
+        const txn = await contract.mintNGN(amount);
+        await txn.wait();
+        alert('Tokens minted');
+        let inventory = await contract.inventory();
+        inventory = utils.formatEther(inventory);
+        setTokenTotalInventory(inventory);
+      } else {
+        setError(error);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const burn = async (event) => {
+    event.preventDefault();
+    try {
+      if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(
+          SMART_CONTRACT_ADDRESS,
+          SMART_CONTRACT_ABI,
+          signer
+        );
+
+        const txn = await contract.burnNGN(
+          utils.parseEther(inputValue.burnAmount)
+        );
+
+        await txn.wait();
+        alert('Tokens burned');
+
+        let inventory = await contract.inventory();
+        inventory = utils.formatEther(inventory);
+        setTokenTotalInventory(inventory);
+      } else {
+        setError(error);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleInputChange = (e) => {
     setInputValue((prevFormData) => ({
       ...prevFormData,
-      [event.target.name]: event.target.value,
+      [e.target.name]: e.target.value,
     }));
   };
 
-  const handleTransferToken = (event) => {
-    event.preventDefault();
-    transferToken(inputValue);
-  };
-
-  const handleBurnTokens = (event) => {
-    event.preventDefault();
-    burnTokens(inputValue);
-  };
-
-  const handleMintTokens = (event) => {
-    event.preventDefault();
-    mintTokens(inputValue);
-  };
+  useEffect(() => {
+    walletConnected();
+    callContract();
+  }, []);
 
   return (
     <div className='relative bg-[#4C4B16]'>
@@ -68,14 +158,16 @@ const Home = () => {
       </div>
       <div className='px-4 py-16 mx-auto sm:max-w-xl md:max-w-full lg:max-w-screen-xl md:px-24 lg:px-8 lg:py-20'>
         <div className='relative max-w-2xl sm:mx-auto sm:max-w-xl md:max-w-2xl sm:text-center'>
-          {error && <p className='text-2xl text-red-700'>{error}</p>}
           <h2 className='mb-6 font-sans text-3xl font-bold tracking-tight text-white sm:text-4xl sm:leading-none'>
             {tokenName}
             <br className='block' />
             <strong>Total Balance:</strong>{' '}
             <span className='relative inline-block px-2'>
               <div className='absolute inset-0 transform -skew-x-12 bg-teal-accent-400' />
-              <span className='relative text-[#B5C99A]'>{tokenInventory} </span>
+              <span className='relative text-[#B5C99A]'>
+               
+                {tokenTotalInventory}
+              </span>
             </span>
           </h2>
           <h3 className='mb-6 font-sans font-bold tracking-tight text-white sm:text-2xl sm:leading-none'>
@@ -88,73 +180,58 @@ const Home = () => {
               </span>
             </span>
           </h3>
-          <h4 className='mb-6 font-sans font-bold tracking-tight text-white sm:text-2xl sm:leading-none'>
-            Your Wallet Address:
-            <br className='block' />
-            <span className='relative inline-block px-2'>
-              <div className='absolute inset-0 transform -skew-x-12 bg-teal-accent-400' />
-              <span className='relative text-[#B5C99A]'>{userAddress}</span>
-            </span>
-          </h4>
-          {/*************************** send tokens ***************************/}
-          <form className='flex flex-col items-center w-full mb-4 md:flex-row md:px-16'>
-            <input
-              onChange={handleInputChange}
-              name='walletAddress'
-              placeholder='Receiver Address'
-              value={inputValue.walletAddress}
-              type='text'
-              className='flex-grow w-full h-12 px-4 mb-3 text-[#4C4B16] transition duration-200 border-2 border-transparent rounded appearance-none md:mr-2 md:mb-0 bg-deep-purple-900 focus:border-teal-accent-700 focus:outline-none focus:shadow-outline'
-            />
-            <input
-              onChange={handleInputChange}
-              name='transferAmount'
-              placeholder={`0.0000 ${tokenSymbol}`}
-              value={inputValue.transferAmount}
-              type='text'
-              className='flex-grow w-full h-12 px-4 mb-3 text-[#4C4B16] transition duration-200 border-2 border-transparent rounded appearance-none md:mr-2 md:mb-0 bg-deep-purple-900 focus:border-teal-accent-700 focus:outline-none focus:shadow-outline'
-            />
-            <button
-              onClick={handleTransferToken}
-              className='inline-flex items-center justify-center w-full h-12 px-6 font-semibold tracking-wide text-white transition duration-200 rounded shadow-lg md:w-auto bg-[#4C4B16] hover:bg-teal-accent-700 focus:shadow-outline focus:outline-none'
-            >
-              Send
-            </button>
-          </form>
-          {/******************************************************/}
-          {/******************** burn tokens ******************/}
-          {isCentralBank && (
+          <div>
+            {isWalletConnected ? (
+              <h4 className='mb-6 font-sans font-bold tracking-tight text-white sm:text-2xl sm:leading-none'>
+                Your Wallet Address:
+                <br className='block' />
+                <span className='relative inline-block px-2'>
+                  <div className='absolute inset-0 transform -skew-x-12 bg-teal-accent-400' />
+                  <span className='relative text-[#B5C99A]'>
+                    {yourWalletAddress}
+                  </span>
+                </span>
+              </h4>
+            ) : (
+              <button className='btn-connect' onClick={walletConnected}>
+                Connect Wallet
+              </button>
+            )}
+          </div>
+          {isTokenOwner && (
             <div>
-              <form className='flex flex-col items-center w-full mb-4 md:flex-row md:px-16'>
-                <input
-                  onChange={handleInputChange}
-                  name='burnAmount'
-                  placeholder={`0.0000 ${tokenSymbol}`}
-                  value={inputValue.burnAmount}
-                  type='text'
-                  className='flex-grow w-full h-12 px-4 mb-3 text-[#4C4B16] transition duration-200 border-2 border-transparent rounded appearance-none md:mr-2 md:mb-0 focus:border-teal-accent-700 focus:outline-none focus:shadow-outline'
-                />
-                <button
-                  onClick={handleBurnTokens}
-                  className='inline-flex items-center justify-center w-full h-12 px-6 font-semibold tracking-wide text-white transition duration-200 rounded shadow-lg md:w-auto bg-[#4C4B16] hover:bg-teal-accent-700 focus:shadow-outline focus:outline-none'
-                >
-                  Burn
-                </button>
-              </form>
+              {/******************** mint tokens ******************/}
               <form className='flex flex-col items-center w-full mb-4 md:flex-row md:px-16'>
                 <input
                   onChange={handleInputChange}
                   name='mintAmount'
-                  placeholder={`0.0000 ${tokenSymbol}`}
+                  placeholder='mint'
                   value={inputValue.mintAmount}
                   type='text'
                   className='flex-grow w-full h-12 px-4 mb-3 text-[#4C4B16] transition duration-200 border-2 border-transparent rounded appearance-none md:mr-2 md:mb-0 bg-deep-purple-900 focus:border-teal-accent-700 focus:outline-none focus:shadow-outline'
                 />
                 <button
-                  onClick={handleMintTokens}
+                  onClick={mint}
                   className='inline-flex items-center justify-center w-full h-12 px-6 font-semibold tracking-wide text-white transition duration-200 rounded shadow-lg md:w-auto bg-[#4C4B16] hover:bg-teal-accent-700 focus:shadow-outline focus:outline-none'
                 >
                   Mint
+                </button>
+              </form>
+              {/******************** burn tokens ******************/}
+              <form className='flex flex-col items-center w-full mb-4 md:flex-row md:px-16'>
+                <input
+                  onChange={handleInputChange}
+                  name='burnAmount'
+                  placeholder={'burn Tokens'}
+                  value={inputValue.burnAmount}
+                  type='text'
+                  className='flex-grow w-full h-12 px-4 mb-3 text-[#4C4B16] transition duration-200 border-2 border-transparent rounded appearance-none md:mr-2 md:mb-0 focus:border-teal-accent-700 focus:outline-none focus:shadow-outline'
+                />
+                <button
+                  onClick={burn}
+                  className='inline-flex items-center justify-center w-full h-12 px-6 font-semibold tracking-wide text-white transition duration-200 rounded shadow-lg md:w-auto bg-[#4C4B16] hover:bg-teal-accent-700 focus:shadow-outline focus:outline-none'
+                >
+                  Burn
                 </button>
               </form>
             </div>
@@ -162,7 +239,6 @@ const Home = () => {
         </div>
       </div>
     </div>
+    // //////////////////////////////////////////////
   );
-};
-
-export default Home;
+}
