@@ -29,13 +29,9 @@ The provided frontend code is a React component that interacts with the NigeriaT
 
 1. Set up a React development environment.
 
-2. Copy and paste the provided frontend code into your React application.
+2. Customize the UI components and styling as desired.
 
-3. Ensure that the required dependencies and custom hooks (useWalletConnection, useTokenInfo, useTransferToken, useBurnTokens, useMintTokens) are imported and available.
-
-4. Customize the UI components and styling as desired.
-
-5. Run your React application to access the NigeriaToken functionality through the frontend.
+3. Run your React application to access the NigeriaToken functionality through the frontend.
 
 ### Help
 
