@@ -18,7 +18,7 @@ contract NigeriaToken {
         tokenName = "NG-Noken"; // Set the token name
         tokenSymbol = "NGN"; // Set the token symbol
         kobo = 18; // Set the number of decimal places for the token
-        inventory = 1000000 * (10**uint256(18)); // Set the initial token inventory
+        inventory = 1000000 * (10**uint256(kobo)); // Set the initial token inventory
     }
 
     function mintNGN(uint256 _value) public returns (bool success) {
