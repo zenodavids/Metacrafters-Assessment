@@ -78,7 +78,7 @@ Please ensure that you have the required Flow blockchain development environment
 
 ## Author
 
-[Author Name]
+Chidozie Ezeanekwe
 
 ## License
 
